@@ -1,93 +1,68 @@
-# Predviđanje potrošnje za 24h unapred
+#  Load forecasting 24 hours ahead
+At the beginning of the file, the libraries used in the code are imported and
+the graphics parameters are set.
 
-Na početku fajla izvršeno je importovanje biblioteka koje se koriste u kodu i
-postavljeni su parametri grafika.
+Then a path is set to the folder containing the data folder and the file
+containing the WindowGenerator class. After that the WindowGenerator class has
+been imported.
 
-Zatim su učitani csv fajlovi u Data Framove. Za svaki do tri fajla kreiran
-je poseban df.
+The main function is defined and the functions necessary for creating an
+adequate dataset are called within it.
 
-Izvršeno je inicijalno upoznavanje sa podacima iz foldera 'Weather_Daily' i
-'Weather_Hourly' tako što je provereno koje vrednosti sadrži fajl i koliko puta
-se javljaju u navedenim vajlovima.
+Then a class with the necessary methods for preparing, dividing, displaying data
+and creating a dataset suitable for model training was used and the input
+parameters for creating data windows were set. The input width is set
+to 24 input data (24h) and the same for output data. Also, the necessary data
+containing training DF, validation DF and test DF were forwarded.
 
-Podaci iz fajla Weather_Hourly podeljeni su u posebne df koji sadrže podatke o
-temperaturi, oblačnosti i vetru.
+After that, the RNN model was formed according to the instructions from the tutorial.
 
-Urađen je, zatim, statistička analiza podatka koji se nalaze u novoformiranim
-dfovima u kojima je primećeno da vrednosti podataka ne odstupaju od realno
-očekivanih vrednosti.
+This model is trained with the compile and fit function, using a previously prepared data window. The plot that is generated shows the efficiency of the created model by showing the actual and predicted values. The second graph shows the performance of the created model, which is also printed in the workspace.
 
-Svakako referenti podatka je potrošnja pa se pristupilo pripremi podataka na
-osnovu dostupnih vrednosti potrošnje. Kako su mi na raspolaganju bili podaci za
-opterećenje od 15. aprila 2013. godine na taj vremenski interval su dovedeni
-podaci o temperaturi. Primetio sam da podaci o oblačnosti i vetru imaju puno
-nedostajućih podataka i da su dostupne vrednosti počevši od kraja 2014. godine.
-Zbog ovoga, ali i zbog poznatih činjenica da oblačnost i vetar direktno utiču na
-temperaturu koja je poznata u celom vremenskom periodu odlučio sam da ove podatke
-ne razmatram nadalje u ovoj prvoj verziji treniranja modela.
+# FUNCTIONS DEFINITIONS
 
-Nakon toga je urađena priprema podatka za korišćenje funkcije difference koja
-je pokazala da u podacima za potrošnju nedostaju merenja za dan 09. januar 2018.
-godine. Dok kod podataka za temperaturu nedostaje samo jedna satna vrednost.
+# Function import_data
+The import_data function imports data from csv files into DataFrames (DF).
+A separate DF is created for each of the three files.
 
-Svi nedostajući satni vremenski odbirci popunjeni su funkcijom resample() uz odabir
-parametra H, a vrednosti su popunjene prethodnom izmerenom vrednošću korišćenjem
-funkcije ffill(). Ovo je u slučaju temperature prihvatljiva aproksimacija jer se
-temperatura iz sata u sat ne menja značajno.
+# Function separete_hour
+Within the separete_hour function, the data from the Weather_Hourly file is divided
+into separate DFs containing data on temperature, cloudiness and wind.
+Cloud and wind data have a lot of missing data and the time period of the first
+available values is from the end of 2014. Due to the unclear way of approximation of the missing values, but also due to the known facts that clouds and wind directly affect the temperature, which is known throughout  the time period, I decided not to consider this data further in this version of data preparation for model training.
 
-Za potrošnju sam odabrao da nedostajuće vrednosi za da 09.01 popunim identičnim  
-izmerenom u danu 08.01. Ova aproksimacija nije najbolje moguće rešenje, ali je
-s obzirom da je poznato da postoji periodičnost opterećenja na dnevnom nivou, a
-ovo se može videti i na slici 1.
+# Function prepare_halfFeature
+Since the goal is to predict consumption for the future, load data are very
+important data. The prepare_halfFeature function is used to prepare the first and second features (load and temperature). Because the load data starts from April 15, 2013, the temperature data is reduced to that time interval.
+After that, data were prepared for the use of the "difference" function,
+which showed that the consumption data lacked measurements for January 9, 2018.
+Temperature data lacks only one hour value.
 
-Na sličan način urađena je priprema podataka iz drugog fajla 'Weather_Daily'.
-S obzirom da su podaci dati na dnevnom nivou funkcijom resample() je urađeno
-kreiranje vremskih odbiraka sa periodom od jednog sata. Nove satne vrednosti su
-iste za sve odbirke u toku dana. I u ovom vajlu je izostalo merenje za 3 dana
-što je takođe rešeno ovom funkcijom..
+All missing hourly timestamps are filled with the resample () function with the
+selection of the parameter H, and the values are filled with the last measured
+value using the ffill() function. This is an acceptable approximation in the case of temperature because the temperature does not change significantly from hour to hour.
 
-Mali problem je nastao oko korišćenja funcije ffil() jer po difoltu ne kreira
-za poslednji dostupan datum već završava sa prethodnim. To je promenljivo
-parametrom 'closed', ali u mom slučaju nije radilo onako kako sam želeo, pa sam
-ja dodao još jedan datum pre korišćenja funcije resample() i onda sam nakon toga
-obrisao datum na kraju.
+For consumption, I chose to fill in the missing values for 09.01 with the identical
+measured on 08.01. This approximation is not the best possible solution,
+but it is satisfactory considering that it is known that there is a periodicity
+of load on a daily basis.
 
-Pripremljen je zbirni dataFrame u kojem je na kraju izvršena gorepomenuta
-aproksimacija potrošnje za nedostajuči 09. januar 2018. godine.
+# Function prepared_dataset
+Data from another file, 'Weather_Daily', was prepared in a similar way.
+Since the data are given on a daily basis, using the resample () function were created of timestamps with a period of one hour for the entire observed time period. The new hourly values are the same for all selections during the same day. There was no measurement in this file for 3 days, which was also solved as in the previous file.
 
-Takođe, već formiranom zbirnom dataFrame-u dodate su vrednosti koje će modelu
-dati uvid u dnevnu i godišnju periodičnost promene opterećenja. Potvrda da su
-godišnja i dnevna periodičnost najizraženija vidljivo je na slici 1 (dva najveća
-pika). Ono što sam primetio na slici 1 je treći po veličini pik koji je na
-frekvenciji manjoj od jednog dana. Pretpostvljajući da su ovo podaci nekog
-industrijskog potrošača ovaj pik je logičan je označava periodičnost u okviru
-radnih sati ovog industijskog postorojenja. Za neki budući rad bi bilo verovatno
-zanimljivo proveriti uticaj ove periodičnosti na rezultate koje model pravi.
+A small problem arose with the use of the ffill() function. By default, the ffill() function does not fill values for the last available date, but ends with the penultimate one. This is changeable with the 'closed' parameter, but in my case it didn't work the way I wanted, so I added another date before using the resample() function and then deleted the date at the end after that.
 
-Nadalje su podaci podeljeni u trening, validacioni i test skup i urađena im je
-normalizacija.
+A summary Data Frame has been prepared, in which the above-mentioned consumption approximation for the missing January 9, 2018 was finally performed.
 
-Sekcija 'Model prepare' odnosi se na definisanje klase sa neophodnim metodima
-za pripremu, podelu, prikazivanje podataka i kreiranje datasetova pogodnih za
-treniranje modela.
-Takođe u toj sekciji definisana je vrednost epoha za treniranje modela i funcija
-za kompaliranje i fitovanje modela.
+Summary Data Frame has added values, which will give the model an insight into the daily and annual periodicity of the load change.
 
-U sekciji 'Multi-step model' dati su ulazni parametri za kreiranje prozora podataka.
-Ulazna širina je postavljena na 24 ulaznih podataka (24h) i isto toliko za izlazne
-podatke.
+# Function plot_fft
+Confirmation that the annual and daily periodicity are most pronounced is visible on the basis of graphs, which are obtained by using the plot_fft function. What I noticed on this plot is the third largest peak, which is at a frequency of less than one day.
+Assuming that this is the data of an industrial consumer, this peak is logical and indicates the periodicity within the working hours of this industrial plant. For some future work, it would probably be interesting to check the impact of this periodicity on the results that the model produces.
 
-Odlučio sam se da treniram 5 različitih modela i da na kraju prikažem njihovu
-metriku na jednog grafiku kako bi se napravilo poređenje među modelima.
+# Function split_normalize_data
+The split_normalize_data function divides the data into training, validation and test data sets and normalizes them.
 
-Trenirani su Linearni model, Dense model, CNN, RNN i autoregressive RNN model.
-Za model CNN ulazni prozor je 12 sample jer sam želeo da proverim kakve će model
-dati rezultate kad se promeni veličina prozora. Rezultati su bolji nego sa
-3 ili 5 sample-a).
-Takođe, za Autoregressive RNN definisana je i klasa sa funcijama neophodnim za
-treniranje istog u skladu sa uputstvima iz tutorijala.
-
-Grafici za trenirane modele sa prikazanim stvarnim i predviđenim vrednostima,
-prikazani su na slikama 2-6, dok je na slici 7 dat grafik sa metrikom modela.
-
-Iz priloženog se vidi da najbolje rezultate daje RNN model.
+# Function compile_and_fit
+Within this function, the value of epochs for model training and other parameters necessary for compiling and fitting models are defined.
