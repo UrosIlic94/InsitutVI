@@ -24,12 +24,12 @@ from window import WindowGenerator
 
 def main():
 
-    import_data()
-    separate_hour()
-    prepare_halfFeature()
-    prepared_dataset()
-    plot_fft()
-    split_normalize_data()
+    df_load, df_wday, df_whour = import_data()
+    df_cloud, df_wind, df_temp_full = separate_hour(df_whour)
+    df_load_08, df_ready = prepare_halfFeature(df_temp_full, df_load)
+    df_data = prepared_dataset(df_wday, df_ready, df_load_08)
+    plot_fft(df_data)
+    num_features, train_df, val_df, test_df = split_normalize_data(df_data)
 
     OUT_STEPS = 24
     multi_window = WindowGenerator(
@@ -56,7 +56,7 @@ def main():
         ]
     )
 
-    compile_and_fit(multi_lstm_model, multi_window)
+    history = compile_and_fit(multi_lstm_model, multi_window)
 
     multi_val_performance["LSTM"] = multi_lstm_model.evaluate(multi_window.val)
     multi_performance["LSTM"] = multi_lstm_model.evaluate(multi_window.test,
@@ -87,34 +87,34 @@ def main():
 
 # Function definition
 def import_data():
-    global df_load
+    # global df_load
     df_load = pd.read_csv(fname + "\\EMS\\EMS_Load.csv", delimiter=";",
                           header=0)
-    global df_wday
+    # global df_wday
     df_wday = pd.read_csv(fname + "\\EMS\\EMS_Weather_Daily.csv",
                           delimiter=";", header=0)
-    global df_whour
+    # global df_whour
     df_whour = pd.read_csv(fname + "\\EMS\\EMS_Weather_Hourly.csv",
                            delimiter=";", header=0)
 
-    return
+    return df_load, df_wday, df_whour
 
 
-def separate_hour():
-    global df_cloud
+def separate_hour(df_whour):
+    # global df_cloud
     df_cloud = df_whour[df_whour["WeatherType"] == "Cloud"].drop("WeatherType",
                                                                  axis=1)
-    global df_wind
+    # global df_wind
     df_wind = df_whour[df_whour["WeatherType"] == "Wind"].drop("WeatherType",
                                                                axis=1)
-    global df_temp_full
+    # global df_temp_full
     df_temp_full = df_whour[df_whour["WeatherType"] == "Temperature"].drop(
         "WeatherType", axis=1)
 
-    return
+    return df_cloud, df_wind, df_temp_full
 
 
-def prepare_halfFeature():
+def prepare_halfFeature(df_temp_full, df_load):
     df_temp = df_temp_full[df_temp_full["Timestamp"] >
                            "2013-04-14 23:00:00.000"]
 
@@ -124,15 +124,15 @@ def prepare_halfFeature():
     df_temp_idx = df_temp.set_index("Timestamp")
     df_temp_idx.index = pd.to_datetime(df_temp_idx.index)
 
-    difference_laod = pd.date_range(start="2013-04-15",
+    difference_load = pd.date_range(start="2013-04-15",
                                     end="2018-06-30").difference(
                                         df_load_idx.index)
-    difference_temp = pd.date_range(start="2013-04-15", 
+    difference_temp = pd.date_range(start="2013-04-15",
                                     end="2018-06-30").difference(
                                         df_temp_idx.index)
 
     # Separate data for day 08.01.2018
-    global df_load_08
+    # global df_load_08
     df_load_08 = df_load.loc["41496":"41519"]
 
     # missing day 09.01.2018, all 12 samples get last value from 08.01
@@ -140,16 +140,16 @@ def prepare_halfFeature():
     # add one missing sample with value from previous sample
     df_resample_temp = df_temp_idx.resample("H").ffill()
 
-    global df_ready
+    # global df_ready
     df_ready = pd.concat([df_resample_load, df_resample_temp], axis=1).rename(
         {"WeatherValue": "Temp"}, axis=1
     )
 
-    return
+    return df_load_08, df_ready 
 
 
 # prepare data from file fajla 'Weather Daily'
-def prepared_dataset():
+def prepared_dataset(df_wday, df_ready, df_load_08):
     df_avgTemp_full = df_wday[df_wday["WeatherType"] ==
                               "Average temperature"].drop("WeatherType",
                                                           axis=1)
@@ -224,7 +224,7 @@ def prepared_dataset():
                              axis=1).rename({"WeatherValue": "min Temp"},
                                             axis=1)
 
-    global df_data
+    # global df_data
     df_data = df_ready_all.reset_index()
 
     # Data for day 09.01 is equal with data for day 08.01.2018
@@ -247,11 +247,11 @@ def prepared_dataset():
     df_data["Year sin"] = np.sin(timestamp_s * (2 * np.pi / year))
     df_data["Year cos"] = np.cos(timestamp_s * (2 * np.pi / year))
 
-    return
+    return df_data
 
 
 # Examining of features periodicality
-def plot_fft():
+def plot_fft(df_data):
     fft = tf.signal.rfft(df_data['Load'])
     f_per_dataset = np.arange(0, len(fft))
 
@@ -271,18 +271,18 @@ def plot_fft():
 
 
 # Split data and prepare train, validations and test set
-def split_normalize_data():
+def split_normalize_data(df_data):
     column_indices = {name: i for i, name in enumerate(df_data.columns)}
 
     n = len(df_data)
-    global train_df
-    global val_df
-    global test_df
+    # global train_df
+    # global val_df
+    # global test_df
     train_df = df_data[0: int(n * 0.7)]
     val_df = df_data[int(n * 0.7): int(n * 0.9)]
     test_df = df_data[int(n * 0.9):]
 
-    global num_features
+    # global num_features
     num_features = df_data.shape[1]
 
     # Normalize data
@@ -299,7 +299,7 @@ def split_normalize_data():
     ax = sns.violinplot(x="Column", y="Normalized", data=df_std)
     _ = ax.set_xticklabels(df_data.keys(), rotation=90)
 
-    return train_df, val_df, test_df
+    return num_features, train_df, val_df, test_df
 
 
 def compile_and_fit(model, window, patience=2):
@@ -313,14 +313,14 @@ def compile_and_fit(model, window, patience=2):
         optimizer=tf.optimizers.Adam(),
         metrics=[tf.metrics.MeanAbsoluteError()],
     )
-    global history
+    # global history
     history = model.fit(
         window.train,
         epochs=MAX_EPOCHS,
         validation_data=window.val,
         callbacks=[early_stopping],
     )
-    return
+    return history
 
 
 if __name__ == "__main__":
